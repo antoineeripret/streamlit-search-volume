@@ -87,7 +87,7 @@ with st.expander('STEP 2: Extract Volume'):
                 for key in data.keys():
                     results.loc[len(results)] = [key,data[key]['search_volume']]
                 status_bar.progress(i/len(chunks))
-            status_bar.progress(1)
+            status_bar.progress(100)
 
             
 
@@ -119,7 +119,7 @@ with st.expander('STEP 2: Extract Volume'):
                 except:
                     continue
                 status_bar.progress(i/len(chunks))
-            status_bar.progress(1)
+            status_bar.progress(100)
 
             
             results = (
@@ -140,4 +140,5 @@ with st.expander('STEP 2: Extract Volume'):
                 
 
 
-  
+                
+
