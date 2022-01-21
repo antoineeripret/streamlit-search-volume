@@ -29,6 +29,7 @@ with st.expander('STEP 1: Configure your extraction'):
 
     st.write('If a keyword is not included in a database, volume returned will be 0. **Which doesn\'t mean that it has no search volume ;)**')
     uploaded_file = st.file_uploader("Upload your keywords")
+    st.markdown('**You must use a CSV file, with headers and separated by commas.** If you don\'t, execution will fail!!')
 
     if uploaded_file is not None:
         # Can be used wherever a "file-like" object is accepted:
