@@ -6,6 +6,7 @@ import pandas as pd
 import requests
 import json 
 from io import StringIO
+import ast
 
 def convert_df(df):
     return df.to_csv().encode('utf-8')
@@ -15,7 +16,7 @@ st.title('Download Search Volume')
 st.markdown(
 '''Search volume application done by [Antoine Eripret](https://twitter.com/antoineripret). You can report a bug or an issue in [Github](https://github.com/antoineeripret/streamlit-search-volume).
 
-You can get search volume from [Keyword Surfer](https://surferseo.com/keyword-surfer-extension/) or [Semrush API](https://www.semrush.com/api-analytics/). For the later, **an API is required and you will spend 10 credits per keyword**. 
+You can get search volume from [Keyword Surfer](https://surferseo.com/keyword-surfer-extension/), [Semrush API](https://www.semrush.com/api-analytics/) or [Keywordseverywhere](https://keywordseverywhere.com/). For the later, **an API is required and you will spend 10 credits per keyword**. 
 
 Note that even though there is no hard limit, **I don't advise to retrieve more than 10.000 keywords at once using this tool**. The application is very likely to crash.
 
@@ -24,8 +25,15 @@ Note that even though there is no hard limit, **I don't advise to retrieve more 
 
 with st.expander('STEP 1: Configure your extraction'):
     st.markdown('Use two letters ISO code (es,fr,de...). **Please check Keyword Surfer\'s or Semrush\'s documentation to check if your country is available.** Not all of them are.')
-    source = st.selectbox('Source', ('Keyword Surfer (FREE)', 'Semrush (Paid)'))
-    country = st.text_input('Country')
+    source = st.selectbox('Source', ('Keyword Surfer (FREE)', 'Semrush (Paid)', 'Keywordseverywhere (Paid)'))
+    if source == 'Semrush (Paid)':
+        semrush_api_key = st.text_input('API key')
+    
+    if source == 'Keywordseverywhere (Paid)':
+        keywordseverywhere_api_key = st.text_input('API key')
+        country = st.selectbox('Country',['au','ca','in','za','uk','us'])
+    else:
+        country = st.text_input('Country')
 
     st.write('If a keyword is not included in a database, volume returned will be 0. **Which doesn\'t mean that it has no search volume ;)**')
     uploaded_file = st.file_uploader("Upload your keywords")
@@ -37,15 +45,17 @@ with st.expander('STEP 1: Configure your extraction'):
         #colum selector
         column = st.selectbox('Choose the column with your URLs:', dataframe.columns)
         
-        if source == 'Semrush (Paid)':
-            semrush_api_key = st.text_input('API key (Semrush)')
-        
         if st.button('Save your data'):
 
             try:
                 st.session_state['semrush_api_key'] = semrush_api_key
             except:
                 st.session_state['semrush_api_key'] = None
+            
+            try:
+                st.session_state['keywordseverywhere_api_key'] = keywordseverywhere_api_key
+            except:
+                st.session_state['keywordseverywhere_api_key'] = None
 
             st.session_state['country'] = country
             st.session_state['source'] = source
@@ -117,6 +127,46 @@ with st.expander('STEP 2: Extract Volume'):
                     r = requests.get(url)
                     df = pd.read_csv(StringIO(r.text), sep=';')
                     results = pd.concat([results, df.rename({'Keyword':'keyword', 'Search Volume':'volume'}, axis=1)])
+                except:
+                    continue
+                status_bar.progress(i/len(chunks))
+            status_bar.progress(100)
+
+            
+            results = (
+                    pd.Series(kws)
+                    .to_frame()
+                    .rename({0:'keyword'},axis=1)
+                    .merge(results,on='keyword',how='left')
+                    .fillna(0)
+                    )
+
+            st.download_button(
+                        "Press to download your data",
+                        convert_df(results),
+                        "file.csv",
+                        "text/csv",
+                        key='download-csv'
+                    )
+        elif source == 'Keywordseverywhere (Paid)':
+            keywordseverywhere_api_key = st.session_state['keywordseverywhere_api_key']
+            headers = {
+                'Accept': 'application/json',
+                'Authorization': 'Bearer {}'.format(keywordseverywhere_api_key)
+            }
+            status_bar = st.progress(0)
+            for i in range(len(chunks)):
+                chunk = chunks[i]
+                data = {
+                'country':country, 
+                'currency':'usd', 
+                'dataSource':'gkp', 
+                'kw[]':chunk
+                }
+                try:
+                    r = requests.post('https://api.keywordseverywhere.com/v1/get_keyword_data', headers=headers, data=data)
+                    for element in ast.literal_eval(r.content.decode('utf-8'))['data']:
+                        results.loc[len(results)] = [element['keyword'], element['vol']]
                 except:
                     continue
                 status_bar.progress(i/len(chunks))
