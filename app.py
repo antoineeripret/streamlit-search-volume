@@ -43,7 +43,7 @@ with st.expander('STEP 1: Configure your extraction'):
         # Can be used wherever a "file-like" object is accepted:
         dataframe = pd.read_csv(uploaded_file)
         #colum selector
-        column = st.selectbox('Choose the column with your URLs:', dataframe.columns)
+        column = st.selectbox('Choose the column with your keywords:', dataframe.columns)
         
         if st.button('Save your data'):
 
