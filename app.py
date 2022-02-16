@@ -16,7 +16,7 @@ st.title('Download Search Volume')
 st.markdown(
 '''Search volume application done by [Antoine Eripret](https://twitter.com/antoineripret). You can report a bug or an issue in [Github](https://github.com/antoineeripret/streamlit-search-volume).
 
-You can get search volume from [Keyword Surfer](https://surferseo.com/keyword-surfer-extension/), [Semrush API](https://www.semrush.com/api-analytics/) or [Keywordseverywhere](https://keywordseverywhere.com/). For the later, **an API is required and you will spend 10 credits per keyword**. 
+You can get search volume from [Keyword Surfer](https://surferseo.com/keyword-surfer-extension/), [Semrush API](https://www.semrush.com/api-analytics/), [Keywordseverywhere](https://keywordseverywhere.com/) or [Unlimited Sheets](https://unlimitedsheets.com/). For the later, **an API is required and you will spend 10 credits per keyword**. 
 
 Note that even though there is no hard limit, **I don't advise to retrieve more than 10.000 keywords at once using this tool**. The application is very likely to crash.
 
@@ -25,15 +25,21 @@ Note that even though there is no hard limit, **I don't advise to retrieve more 
 
 with st.expander('STEP 1: Configure your extraction'):
     st.markdown('Use two letters ISO code (es,fr,de...). **Please check Keyword Surfer\'s or Semrush\'s documentation to check if your country is available.** Not all of them are.')
-    source = st.selectbox('Source', ('Keyword Surfer (FREE)', 'Semrush (Paid)', 'Keywordseverywhere (Paid)'))
+    source = st.selectbox('Source', ('Keyword Surfer (FREE)', 'Semrush (Paid)', 'Keywordseverywhere (Paid)', 'Unlimited Sheets (Paid)'))
     if source == 'Semrush (Paid)':
         semrush_api_key = st.text_input('API key')
-    
-    if source == 'Keywordseverywhere (Paid)':
+    elif source == 'Keywordseverywhere (Paid)':
         keywordseverywhere_api_key = st.text_input('API key')
         country = st.selectbox('Country',['au','ca','in','za','uk','us'])
+    elif source == 'Unlimited Sheets (Paid)':
+        unlimitedsheets_api = st.text_input('API key')
+        df = pd.read_csv('locations_serp_google.csv')
+        countries = df[df['location_type']=='Country']['location_name'].unique()
+        country = st.selectbox('Country',countries)
+        language_code = st.text_input('Language Code (es,fr...)')
     else:
         country = st.text_input('Country')
+
 
     st.write('If a keyword is not included in a database, volume returned will be 0. **Which doesn\'t mean that it has no search volume ;)**')
     uploaded_file = st.file_uploader("Upload your keywords")
@@ -56,6 +62,12 @@ with st.expander('STEP 1: Configure your extraction'):
                 st.session_state['keywordseverywhere_api_key'] = keywordseverywhere_api_key
             except:
                 st.session_state['keywordseverywhere_api_key'] = None
+
+            try:
+                st.session_state['unlimitedsheets_api'] = unlimitedsheets_api
+                st.session_state['language_code'] = language_code
+            except:
+                st.session_state['unlimitedsheets_api'] = None
 
             st.session_state['country'] = country
             st.session_state['source'] = source
@@ -188,7 +200,43 @@ with st.expander('STEP 2: Extract Volume'):
                         "text/csv",
                         key='download-csv'
                     )
-                
+
+        elif source == 'Unlimited Sheets (Paid)':
+            chunks = [kws[x:x+1000] for x in range(0, len(kws), 1000)]
+            unlimitedsheets_api = st.session_state['unlimitedsheets_api']
+            language_code = st.session_state['language_code'] 
+            status_bar = st.progress(0)
+            for i in range(len(chunks)):
+                chunk = chunks[i]
+                data = {
+                    "token":unlimitedsheets_api,
+                    "languageCode":language_code,
+                    "keywordList": list(chunk),
+                    "locationName":country
+                }
+                r = requests.post('https://unlimited-sheets.herokuapp.com/api/search-volume/google-ads', json=data)
+                print(r)
+                print(r.content)
+                for element in json.loads(r.content):
+                    results.loc[len(results)] = [element['keyword'], element['searchVolume']]
+                status_bar.progress(i/len(chunks))
+            status_bar.progress(100)
+
+            results = (
+                    pd.Series(kws)
+                    .to_frame()
+                    .rename({0:'keyword'},axis=1)
+                    .merge(results,on='keyword',how='left')
+                    .fillna(0)
+                    )
+
+            st.download_button(
+                        "Press to download your data",
+                        convert_df(results),
+                        "file.csv",
+                        "text/csv",
+                        key='download-csv'
+                    )
 
 
                 
