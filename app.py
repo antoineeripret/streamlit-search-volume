@@ -28,6 +28,7 @@ with st.expander('STEP 1: Configure your extraction'):
     source = st.selectbox('Source', ('Keyword Surfer (FREE)', 'Semrush (Paid)', 'Keywordseverywhere (Paid)', 'Unlimited Sheets (Paid)'))
     if source == 'Semrush (Paid)':
         semrush_api_key = st.text_input('API key')
+        country = st.text_input('Country')
     elif source == 'Keywordseverywhere (Paid)':
         keywordseverywhere_api_key = st.text_input('API key')
         country = st.selectbox('Country',['au','ca','in','za','uk','us'])
